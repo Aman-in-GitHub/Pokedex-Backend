@@ -54,7 +54,7 @@ Output ONLY valid JSON in this exact format:
 Rules:
 - dexNumber is the National Pokédex number as a string, no leading zeros
 - name is lowercase, no spaces (use hyphen for hyphenated names e.g. "mr-mime")
-- If there is genuinely no reasonable Pokémon match, return: { "dexNumber": "undefined", "name": "undefined" }
+- If there is genuinely no reasonable Pokémon match, return: { "dexNumber": "unknown", "name": "unknown" }
 - No explanation, no extra text — JSON only
 `;
 
@@ -206,7 +206,7 @@ app.post("/pokedex", async (c) => {
       console.error(`Failed to identify Pokémon after ${MAX_RETRIES} attempts`);
 
       const ext = picture.type.split("/")[1] || "jpg";
-      const failFileName = `undefined-${Math.random().toString(36).substring(2, 10)}.${ext}`;
+      const failFileName = `unknown-${Math.random().toString(36).substring(2, 10)}.${ext}`;
 
       await supabase.storage
         .from("pokedex-images")
