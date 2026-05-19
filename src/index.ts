@@ -137,7 +137,7 @@ app.post("/pokedex", async (c) => {
     for (attempts = 1; attempts <= MAX_RETRIES; attempts++) {
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-3.1-flash-lite-preview",
+          model: "gemini-3.1-flash-lite",
           contents: createUserContent([
             createPartFromUri(
               uploadedFile.uri as string,
