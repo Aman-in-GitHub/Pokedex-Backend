@@ -11,50 +11,46 @@ import { getConnInfo } from "hono/cloudflare-workers";
 import { supabase } from "./supabase";
 
 const PROMPT = `
-You are an expert Pokédex AI with complete knowledge of all official Pokémon across generations 1–9.
+You are an expert Pokédex AI with complete knowledge of all official Pokémon across all generations.
 
 Your task: Identify which Pokémon the uploaded image most closely resembles.
 
----
+BEFORE ANYTHING — If the image contains a real human face or body, immediately return:
+{ "dexNumber": "unknown", "name": "unknown" }
+Do not proceed further.
 
 STEP 1 — Understand what the image shows
 Determine the subject: real animal, plant, object, food, landscape feature, mythical creature, drawn character, etc.
+If it is a man-made object (car, phone, building, furniture) or abstract/unclear, return unknown immediately.
 
 STEP 2 — Build your candidate list
-Think broadly across ALL 9 generations. Ask yourself:
-- Which Pokémon were directly inspired by this type of animal, plant, or object?
-- Which Pokémon share the most visual traits with it?
-
-Examples to guide you:
+Think broadly across ALL 9 generations. Which Pokémon share the most visual traits?
 - Real cat → Meowth, Persian, Skitty, Glameow, Purrloin, Espurr, Litten, Sprigatito…
 - Real turtle → Squirtle, Blastoise, Turtwig, Tirtouga…
 - Real bear → Teddiursa, Ursaring, Cubchoo, Bewear…
 - Mushroom → Paras, Parasect, Foongus, Amoonguss, Shroomish…
-- Thunder / lightning shape → Pikachu, Raichu, Jolteon, Electrike…
-- Rock / boulder → Geodude, Graveler, Golem, Rolycoly, Stonjourner…
+- Lightning → Pikachu, Raichu, Jolteon, Electrike…
+- Rock → Geodude, Graveler, Golem, Rolycoly, Stonjourner…
 
 STEP 3 — Compare visually
-For each candidate, evaluate:
 - Body shape and silhouette
 - Color palette and markings
-- Distinctive features (ears, tail, horns, limbs, fins, wings, etc.)
-- Size proportions and posture
-- Texture and surface patterns
+- Distinctive features (ears, tail, horns, fins, wings, etc.)
+- Proportions, posture, texture
 
 STEP 4 — Pick the single best match
-Choose the one Pokémon with the strongest overall visual resemblance. Prioritise shape and colour over species inspiration alone.
+Strongest overall visual match wins. Prioritise shape and colour over species inspiration.
+If confidence is low, return unknown — do not force a bad match.
 
-STEP 5 — Return your answer
-Output ONLY valid JSON in this exact format:
-{
-  "dexNumber": "25",
-  "name": "pikachu"
-}
+STEP 5 — Output ONLY valid JSON. No other text, no markdown, no explanation.
+Valid examples:
+{ "dexNumber": "25", "name": "pikachu" }
+{ "dexNumber": "unknown", "name": "unknown" }
 
 Rules:
-- dexNumber is the National Pokédex number as a string, no leading zeros
-- name is lowercase, no spaces (use hyphen for hyphenated names e.g. "mr-mime")
-- If there is genuinely no reasonable Pokémon match, return: { "dexNumber": "unknown", "name": "unknown" }
+- dexNumber as a string, no leading zeros
+- name lowercase, hyphens only (e.g. "mr-mime")
+- No match or real human → { "dexNumber": "unknown", "name": "unknown" }
 - No explanation, no extra text — JSON only
 `;
 
@@ -71,6 +67,7 @@ const MAX_RETRIES = 3;
 const MAX_FILE_SIZE_MB = 25;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
+const GEMINI_MODEL = "gemini-3.5-flash";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 if (!GEMINI_API_KEY) {
@@ -137,7 +134,7 @@ app.post("/pokedex", async (c) => {
     for (attempts = 1; attempts <= MAX_RETRIES; attempts++) {
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-3.1-flash-lite",
+          model: GEMINI_MODEL,
           contents: createUserContent([
             createPartFromUri(
               uploadedFile.uri as string,
